@@ -100,39 +100,92 @@ FOREVER = 32000000.0
 # each of which is a same-size vector of values with one of the below types.
 
 # For up to 24-bit precision measurements in the appropriate physical unit (
-# e.g., microvolts). Integers from -16777216 to 16777216 are represented
-# accurately.
-cf_float32 = 1
-# For universal numeric data as long as permitted by network and disk budget.
-#  The largest representable integer is 53-bit.
-cf_double64 = 2
-# For variable-length ASCII strings or data blobs, such as video frames,
-# complex event descriptions, etc.
-cf_string = 3
-# For high-rate digitized formats that require 32-bit precision. Depends
-# critically on meta-data to represent meaningful units. Useful for
-# application event codes or other coded data.
-cf_int32 = 4
-# For very high bandwidth signals or CD quality audio (for professional audio
-#  float is recommended).
-cf_int16 = 5
-# For binary signals or other coded data.
-cf_int8 = 6
-# For now only for future compatibility. Support for this type is not
-# available on all languages and platforms.
-cf_int64 = 7
-# Can not be transmitted.
-cf_undefined = 0
+class ValueFormats(IntEnum):
+    """
+    Value formats supported by Lab Streaming Layer (LSL).
 
-# Post processing flags
-proc_none = 0  # No automatic post-processing; return the ground-truth time stamps for manual post-processing.
-proc_clocksync = 1  # Perform automatic clock synchronization; equivalent to manually adding the time_correction().
-proc_dejitter = 2  # Remove jitter from time stamps using a smoothing algorithm to the received time stamps.
-proc_monotonize = 4  # Force the time-stamps to be monotonically ascending. Only makes sense if timestamps are dejittered.
-proc_threadsafe = 8  # Post-processing is thread-safe (same inlet can be read from by multiple threads).
-proc_ALL = (
-    proc_none | proc_clocksync | proc_dejitter | proc_monotonize | proc_threadsafe
-)
+    LSL data streams are a sequence of samples, each of which is the same size vector of values with one of the below \
+    types.
+    """
+
+    CF_UNDEFINED = 0
+    """Cannot be transmitted"""
+
+    CF_FLOAT32 = 1
+    """
+    Up to 24-bit precision measurements in the appropriate physical unit e.g. micro volts.
+    Integers from -16777216 to 16777216 are represented accurately.
+    """
+
+    CF_DOUBLE64 = 2
+    """
+    For universal numeric data, as long as permitted by network and disk budget.
+    The largest representable integer is 53-bit.
+    """
+
+    CF_STRING = 3
+    """
+    For variable length ASCII strings or data blobs. E.g. video frames, complex event descriptions, etc.
+    """
+
+    CF_INT32 = 4
+    """
+    For high rate digitized formats that require 32-bit precision.
+    Depends critically on meta-data to represent meaningful units.
+    Useful for application event codes or other coded data.
+    """
+
+    CF_INT16 = 5
+    """
+    For very high bandwidth signals or CD quality audio.
+    CF_FLOAT32 is recommended for professional audio.
+    """
+
+    CF_INT8 = 6
+    """
+    For binary signals or other coded data.
+    """
+
+    CF_INT64 = 7
+    """
+    For future compatibility. Support for this type is not available on all languages and platforms.
+    """
+
+
+class PostProcessing(IntEnum):
+    """
+    Post-processing functions supported by Lab Streaming Layer (LSL).
+    """
+
+    PROC_NONE = 0
+    """
+    No automatic post-processing. Return the ground truth timestamps for manual post-processing.
+    """
+
+    PROC_CLOCKSYNC = 1
+    """
+    Perform automatic clock synchronization. Equivalent to manually adding `StreamInlet.time_correction()`.
+    """
+
+    PROC_DEJITTER = 2
+    """
+    Remove jitter from timestamps using a smoothing algorithm to the received timestamps.
+    """
+
+    PROC_MONOTONIZE = 4
+    """
+    Force the timestamps to be monotonically ascending. Only makes sense if timestamps are dejittered.
+    """
+
+    PROC_THREADSAFE = 8
+    """
+    Post-processing is thread safe (same inlet can be read from multiple threads).
+    """
+
+    PROC_ALL = (PROC_NONE | PROC_CLOCKSYNC | PROC_DEJITTER | PROC_MONOTONIZE | PROC_THREADSAFE)
+    """
+    Apply all post-processing functions.
+    """
 
 
 # ==========================================================
@@ -680,7 +733,7 @@ class StreamOutlet:
 
         """
         if len(x) == self.channel_count:
-            if self.channel_format == cf_string:
+            if self.channel_format == ValueFormats.CF_STRING.value:
                 x = [v.encode("utf-8") for v in x]
             handle_error(
                 self.do_push_sample(
@@ -750,7 +803,7 @@ class StreamOutlet:
             if len(x):
                 if type(x[0]) is list:
                     x = [v for sample in x for v in sample]
-                if self.channel_format == cf_string:
+                if self.channel_format == ValueFormats.CF_STRING.value:
                     x = [v.encode("utf-8") for v in x]
                 if len(x) % self.channel_count == 0:
                     # x is a flattened list of multiplexed values
@@ -1091,7 +1144,7 @@ class StreamInlet:
         handle_error(errcode)
         if timestamp:
             sample = [v for v in self.sample]
-            if self.channel_format == cf_string:
+            if self.channel_format == ValueFormats.CF_STRING.value:
                 sample = [v.decode("utf-8") for v in sample]
             if assign_to is not None:
                 assign_to[:] = sample
@@ -1159,7 +1212,7 @@ class StreamInlet:
                 [data_buff[s * num_channels + c] for c in range(num_channels)]
                 for s in range(int(num_samples))
             ]
-            if self.channel_format == cf_string:
+            if self.channel_format == ValueFormats.CF_STRING.value:
                 samples = [[v.decode("utf-8") for v in s] for s in samples]
                 free_char_p_array_memory(data_buff, max_values)
         else:
@@ -1740,13 +1793,13 @@ else:
 
 # set up some type maps
 string2fmt = {
-    "float32": cf_float32,
-    "double64": cf_double64,
-    "string": cf_string,
-    "int32": cf_int32,
-    "int16": cf_int16,
-    "int8": cf_int8,
-    "int64": cf_int64,
+    "float32": ValueFormats.CF_FLOAT32.value,
+    "double64": ValueFormats.CF_DOUBLE64.value,
+    "string": ValueFormats.CF_STRING.value,
+    "int32": ValueFormats.CF_INT32.value,
+    "int16": ValueFormats.CF_INT16.value,
+    "int8": ValueFormats.CF_INT8.value,
+    "int64": ValueFormats.CF_INT64.value,
 }
 fmt2string = [
     "undefined",
