@@ -20,6 +20,7 @@ import os
 import platform
 import struct
 import warnings
+from collections.abc import Generator
 from ctypes import byref, c_byte, c_char_p, c_double, c_float, c_int, c_long, c_longlong, c_short, c_size_t, c_void_p, \
     cast, CDLL, POINTER, util
 from enum import IntEnum
@@ -144,30 +145,6 @@ __all__ = ([
 # === Constants ===
 # =================
 
-# Deprecated enum module variables for value formats supported by Lab Streaming Layer (LSL).
-_deprecated_cf_float32 = 1
-_deprecated_cf_double64 = 2
-_deprecated_cf_string = 3
-_deprecated_cf_int32 = 4
-_deprecated_cf_int16 = 5
-_deprecated_cf_int8 = 6
-_deprecated_cf_int64 = 7
-_deprecated_cf_undefined = 0
-
-# Deprecated enum module variables for post-processing functions supported by Lab Streaming Layer (LSL).
-_deprecated_proc_none = 0
-_deprecated_proc_clocksync = 1
-_deprecated_proc_dejitter = 2
-_deprecated_proc_monotonize = 4
-_deprecated_proc_threadsafe = 8
-_deprecated_proc_ALL = (
-        _deprecated_proc_none |
-        _deprecated_proc_clocksync |
-        _deprecated_proc_dejitter |
-        _deprecated_proc_monotonize |
-        _deprecated_proc_threadsafe
-)
-
 IRREGULAR_RATE = 0.0
 """
 Constant to indicate that a stream has a variable sampling rate.
@@ -278,57 +255,69 @@ class PostProcessing(IntEnum):
 # === Free Functions provided by the lab streaming layer ===
 # ==========================================================
 
-
-def protocol_version():
-    """Protocol version.
-
-    The major version is protocol_version() / 100;
-    The minor version is protocol_version() % 100;
-
-    Clients with different minor versions are protocol-compatible with each
-    other while clients with different major versions will refuse to work
-    together.
-
+def protocol_version() -> int:
     """
+    Get the protocol version.
+
+    .. code-block:: python
+        major_version = protocol_version() / 100
+        minor_version = protocol_version() % 100
+
+    Different **minor** versions across clients **are** protocol compatible. Different **major** versions **are not**.
+
+    :return: The protocol version. Further processing required to get major and minor versions.
+    """
+
     return lib.lsl_protocol_version()
 
 
-def library_version():
-    """Version of the underlying liblsl library.
-
-    The major version is library_version() / 100;
-    The minor version is library_version() % 100;
-
+def library_version() -> int:
     """
+    Get the underlying liblsl library version.
+
+    .. code-block:: python
+        major_version = protocol_version() / 100
+        minor_version = protocol_version() % 100
+
+    :return: The underlying liblsl library version. Further processing required to get major and minor 
+    versions.
+    """
+
     return lib.lsl_library_version()
 
 
-def library_info():
-    """Get a string containing library information. The format of the string shouldn't be used
-    for anything important except giving a debugging person a good idea which exact library
-    version is used."""
+def library_info() -> str:
+    """
+    Get a string containing information about the underlying liblsl library.
+
+    .. warning::
+        The format of the string should not be used except for debugging purposes.
+
+    :return: The underlying liblsl library information.
+    """
+
     return lib.lsl_library_info().decode("utf-8")
 
 
-def local_clock():
-    """Obtain a local system timestamp in seconds.
-
-    The resolution is better than a millisecond. This reading can be used to
-    assign timestamps to samples as they are being acquired.
-
-    If the "age" of a sample is known at a particular time (e.g., from USB
-    transmission delays), it can be used as an offset to lsl_local_clock() to
-    obtain a better estimate of when a sample was actually captured. See
-    StreamOutlet.push_sample() for a use case.
-
+def local_clock() -> float:
     """
+    Get local system timestamp in seconds with better than microsecond precision.
+
+    .. note::
+        This reading can be used to assign timestamps to samples as they are being acquired.
+
+        If the *age* of the sample is known at a particular time (e.g. from USB transmission delays), it can be used 
+        as an offset to lsl_local_clock() to obtain a better estimate of when the sample was actually captured.
+
+    :return: The local system timestamp in seconds.
+    """
+
     return lib.lsl_local_clock()
 
 
 # ==========================
 # === Stream Declaration ===
 # ==========================
-
 
 class StreamInfo:
     """The StreamInfo object stores the declaration of a data stream.
@@ -938,55 +927,50 @@ class StreamOutlet:
 # =========================
 
 
-def resolve_streams(wait_time=1.0):
-    """Resolve all streams on the network.
-
-    This function returns all currently available streams from any outlet on
-    the network. The network is usually the subnet specified at the local
-    router, but may also include a group of machines visible to each other via
-    multicast packets (given that the network supports it), or list of
-    hostnames. These details may optionally be customized by the experimenter
-    in a configuration file (see Network Connectivity in the LSL wiki).
-
-    Keyword arguments:
-    wait_time -- The waiting time for the operation, in seconds, to search for
-                 streams. Warning: If this is too short (<0.5s) only a subset
-                 (or none) of the outlets that are present on the network may
-                 be returned. (default 1.0)
-
-    Returns a list of StreamInfo objects (with empty desc field), any of which
-    can subsequently be used to open an inlet. The full description can be
-    retrieved from the inlet.
-
+def resolve_streams(wait_time: float = 1.0) -> list[StreamInfo]:
     """
+    Resolve all streams on the network.
+
+    .. note::
+        Returns all currently available streams from any outlet on the network. 
+        The network is usually the subnet specified at the local router, but may include a group of machines visible to
+        each other via multicast packets (if the network supports it), or a list of hostnames. 
+        These details may optionally be customized by the experimenter in a configuration file.
+        See `Network Connectivity <https://labstreaminglayer.readthedocs.io/info/network-connectivity.html#network-troubleshooting>`_.
+
+    :param wait_time: Wait time in seconds to search for streams. <0.5 seconds may return a subset (or none) of the 
+                      streams available on the network.
+    :return: List of StreamInfo objects (with empty desc fields). Any can be used to open an inlet and then the full
+             description can then be retrieved.
+    """
+
     # noinspection PyCallingNonCallable
     buffer = (c_void_p * 1024)()
     num_found = lib.lsl_resolve_all(byref(buffer), 1024, c_double(wait_time))
     return [StreamInfo(handle=buffer[k]) for k in range(num_found)]
 
 
-def resolve_byprop(prop, value, minimum=1, timeout=FOREVER):
-    """Resolve all streams with a specific value for a given property.
-
-    If the goal is to resolve a specific stream, this method is preferred over
-    resolving all streams and then selecting the desired one.
-
-    Keyword arguments:
-    prop -- The StreamInfo property that should have a specific value (e.g.,
-            "name", "type", "source_id", or "desc/manufacturer").
-    value -- The string value that the property should have (e.g., "EEG" as
-             the type property).
-    minimum -- Return at least this many streams. (default 1)
-    timeout -- Optionally a timeout of the operation, in seconds. If the
-               timeout expires, less than the desired number of streams
-               (possibly none) will be returned. (default FOREVER)
-
-    Returns a list of matching StreamInfo objects (with empty desc field), any
-    of which can subsequently be used to open an inlet.
-
-    Example: results = resolve_Stream_byprop("type","EEG")
-
+def resolve_byprop(prop: str, value: str, minimum: int = 1, timeout: float = FOREVER) -> list[StreamInfo]:
     """
+    Resolve all streams on the network with a specific value for a given property.
+    
+    .. note::
+        If the goal is to resolve a specific stream, this method is preferred over resolving all streams 
+        and then selecting the desired one.
+    
+    .. code-block:: python
+        :caption: Example
+        
+        results = resolve_byprop("type", "EEG")
+    
+    :param prop: The StreamInfo property, e.g. "name", "type", "source_id" or "desc/manufacturer".
+    :param value: The value of the StreamInfo property, e.g. "EEG".
+    :param minimum: Return at least this many streams.
+    :param timeout: Optional, a timeout in seconds. If expires, a subset (or none) of the streams may be returned.
+    :return: List of StreamInfo objects (with empty desc fields). Any can be used to open an inlet and then the full
+             description can then be retrieved.
+    """
+
     # noinspection PyCallingNonCallable
     buffer = (c_void_p * 1024)()
     num_found = lib.lsl_resolve_byprop(
@@ -1000,27 +984,28 @@ def resolve_byprop(prop, value, minimum=1, timeout=FOREVER):
     return [StreamInfo(handle=buffer[k]) for k in range(num_found)]
 
 
-def resolve_bypred(predicate, minimum=1, timeout=FOREVER):
-    """Resolve all streams that match a given predicate.
-
-    Advanced query that allows to impose more conditions on the retrieved
-    streams; the given string is an XPath 1.0 predicate for the <description>
-    node (omitting the surrounding []'s), see also
-    http://en.wikipedia.org/w/index.php?title=XPath_1.0&oldid=474981951.
-
-    Keyword arguments:
-    predicate -- The predicate string, e.g. "name='BioSemi'" or
-                "type='EEG' and starts-with(name,'BioSemi') and
-                 count(description/desc/channels/channel)=32"
-    minimum -- Return at least this many streams. (default 1)
-    timeout -- Optionally a timeout of the operation, in seconds. If the
-               timeout expires, less than the desired number of streams
-               (possibly none) will be returned. (default FOREVER)
-
-    Returns a list of matching StreamInfo objects (with empty desc field), any
-    of which can subsequently be used to open an inlet.
-
+def resolve_bypred(predicate: str, minimum: int = 1, timeout: float = FOREVER) -> list[StreamInfo]:
     """
+    Resolve all streams on the network with a specific predicate.
+    
+    .. note::
+        An advanced query that allows to impose conditions on the retrieved streams. 
+        The given predicate is an XPath 1.0 predicate for the <description> node (omitting the surrounding []).
+        See `XPath <https://en.wikipedia.org/wiki/XPath>`_.
+    
+    .. code-block:: python
+        :caption: Example
+        
+        results = resolve_bypred("type=EEG")
+    
+    :param predicate: The StreamInfo predicate, e.g. "name=BioSemi", "type=EEG", "starts-with(name, BioSemi)"
+                      or "count(description/desc/channels/channel)=32".
+    :param minimum: Return at least this many streams.
+    :param timeout: Optional, a timeout in seconds. If expires, a subset (or none) of the streams may be returned.
+    :return: List of StreamInfo objects (with empty desc fields). Any can be used to open an inlet and then the full
+             description can then be retrieved.
+    """
+
     # noinspection PyCallingNonCallable
     buffer = (c_void_p * 1024)()
     num_found = lib.lsl_resolve_bypred(
@@ -1582,8 +1567,16 @@ class InternalError(RuntimeError):
     pass
 
 
-def handle_error(errcode):
-    """Error handler function. Translates an error code into an exception."""
+def handle_error(errcode: c_int | int):
+    """
+    Liblsl error handler. Translates a liblsl error code into a Python exception.
+    
+    :raise TimeoutError: Operation timed out.
+    :raise LostError: Stream has been lost.
+    :raise InvalidArgumentError: Incorrectly specified argument.
+    :raise InternalError: Internal liblsl error.
+    :raise RuntimeError: An unknown error occurred.
+    """
     if type(errcode) is c_int:
         errcode = errcode.value
     if errcode == 0:
@@ -1600,72 +1593,30 @@ def handle_error(errcode):
         raise RuntimeError("an unknown error has occurred.")
 
 
-# =================================================
-# === Compatibility Interface for old pylsl API ===
-# =================================================
-
-# set class aliases
-_deprecated_stream_info = StreamInfo
-_deprecated_stream_outlet = StreamOutlet
-_deprecated_stream_inlet = StreamInlet
-_deprecated_xml_element = XMLElement
-_deprecated_timeout_error = TimeoutError
-_deprecated_lost_error = LostError
-_deprecated_vectorf = _deprecated_vectord = _deprecated_vectorl = _deprecated_vectori = _deprecated_vectors = \
-    _deprecated_vectorc = _deprecated_vectorstr = list
-
-
-def resolve_stream(*args):
-    warnings.warn(
-        "`resolve_stream()` is deprecated. Use `ContinuousResolver` class or `resolve_streams()`, \
-         `resolve_byprop()` or `resolve_bypred()` functions instead.", DeprecationWarning, stacklevel=3)
-
-    if len(args) == 0:
-        return resolve_streams()
-    elif type(args[0]) in [int, float]:
-        return resolve_streams(args[0])
-    elif type(args[0]) is str:
-        if len(args) == 1:
-            return resolve_bypred(args[0])
-        elif type(args[1]) in [int, float]:
-            return resolve_bypred(args[0], args[1])
-        else:
-            if len(args) == 2:
-                return resolve_byprop(args[0], args[1])
-            else:
-                return resolve_byprop(args[0], args[1], args[2])
-
-
 # ==================================
 # === Module Initialization Code ===
 # ==================================
 
 
-def find_liblsl_libraries(verbose=False):
-    """finds the binary lsl library.
-
-    Search order is to first try to use the path stored in the environment
-    variable PYLSL_LIB (if available), then search through the package
-    directory, and finally search the whole system.
-
-    returns
-    -------
-
-    path: Generator[str]
-        a generator yielding possible paths to the library
-
+def find_liblsl_libraries(verbose: bool = False) -> Generator[str]:
     """
+    Finds the binary LSL library.
+    
+    Search order is first to try to use the path stored in the environment variable PYLSL_LIB (if available),
+    then search through the package directory and then finally the whole system.
+    
+    :param verbose: Provide additional detail for debugging purposes.
+    :raise RuntimeError: Unknown operating system error.
+    :return: Yield possible paths to the library.  
+    """
+
     # find and load library
     if "PYLSL_LIB" in os.environ:
         path = os.environ["PYLSL_LIB"]
         if os.path.isfile(path):
             yield path
         elif verbose:
-            print(
-                "Skipping PYLSL_LIB:",
-                path,
-                " because it was either not " + "found or is not a valid file",
-            )
+            print(f"Skipping PYLSL_LIB: {path} because it was either not found or is not a valid file.")
 
     os_name = platform.system()
     if os_name in ["Windows", "Microsoft"]:
@@ -1960,3 +1911,62 @@ except Exception:
     fmt2push_chunk = [None] * len(fmt2string)
     fmt2push_chunk_n = [None] * len(fmt2string)
     fmt2pull_chunk = [None] * len(fmt2string)
+
+# ==================
+# === Deprecated ===
+# ==================
+
+# Deprecated enum module variables for value formats supported by Lab Streaming Layer (LSL).
+_deprecated_cf_float32 = 1
+_deprecated_cf_double64 = 2
+_deprecated_cf_string = 3
+_deprecated_cf_int32 = 4
+_deprecated_cf_int16 = 5
+_deprecated_cf_int8 = 6
+_deprecated_cf_int64 = 7
+_deprecated_cf_undefined = 0
+
+# Deprecated enum module variables for post-processing functions supported by Lab Streaming Layer (LSL).
+_deprecated_proc_none = 0
+_deprecated_proc_clocksync = 1
+_deprecated_proc_dejitter = 2
+_deprecated_proc_monotonize = 4
+_deprecated_proc_threadsafe = 8
+_deprecated_proc_ALL = (
+        _deprecated_proc_none |
+        _deprecated_proc_clocksync |
+        _deprecated_proc_dejitter |
+        _deprecated_proc_monotonize |
+        _deprecated_proc_threadsafe
+)
+
+# Deprecated class aliases
+_deprecated_stream_info = StreamInfo
+_deprecated_stream_outlet = StreamOutlet
+_deprecated_stream_inlet = StreamInlet
+_deprecated_xml_element = XMLElement
+_deprecated_timeout_error = TimeoutError
+_deprecated_lost_error = LostError
+_deprecated_vectorf = _deprecated_vectord = _deprecated_vectorl = _deprecated_vectori = _deprecated_vectors = \
+    _deprecated_vectorc = _deprecated_vectorstr = list
+
+
+def resolve_stream(*args):
+    warnings.warn(
+        "`resolve_stream()` is deprecated. Use `ContinuousResolver` class or `resolve_streams()`, \
+         `resolve_byprop()` or `resolve_bypred()` functions instead.", DeprecationWarning, stacklevel=3)
+
+    if len(args) == 0:
+        return resolve_streams()
+    elif type(args[0]) in [int, float]:
+        return resolve_streams(args[0])
+    elif type(args[0]) is str:
+        if len(args) == 1:
+            return resolve_bypred(args[0])
+        elif type(args[1]) in [int, float]:
+            return resolve_bypred(args[0], args[1])
+        else:
+            if len(args) == 2:
+                return resolve_byprop(args[0], args[1])
+            else:
+                return resolve_byprop(args[0], args[1], args[2])
