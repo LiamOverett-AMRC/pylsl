@@ -9,7 +9,7 @@ The API covers two areas:
 - The "push API" allows to create stream outlets and to push data (regular
   or irregular measurement time series, event data, coded audio/video frames,
   etc.) into them.
-- The "pull API" allows to create stream inlets and read time-synched
+- The "pull API" allows to create stream inlets and read time-synced
   experiment data from them (for recording, viewing or experiment control).
 
 pylsl has been tested with Python 2.7 and 3.4.
@@ -166,16 +166,16 @@ def library_version():
 
 def library_info():
     """Get a string containing library information. The format of the string shouldn't be used
-    for anything important except giving a a debugging person a good idea which exact library
+    for anything important except giving a debugging person a good idea which exact library
     version is used."""
     return lib.lsl_library_info().decode("utf-8")
 
 
 def local_clock():
-    """Obtain a local system time stamp in seconds.
+    """Obtain a local system timestamp in seconds.
 
     The resolution is better than a millisecond. This reading can be used to
-    assign time stamps to samples as they are being acquired.
+    assign timestamps to samples as they are being acquired.
 
     If the "age" of a sample is known at a particular time (e.g., from USB
     transmission delays), it can be used as an offset to lsl_local_clock() to
@@ -210,14 +210,14 @@ class StreamInfo:
     """
 
     def __init__(
-        self,
-        name="untitled",
-        type="",
-        channel_count=1,
-        nominal_srate=IRREGULAR_RATE,
-        channel_format=cf_float32,
-        source_id="",
-        handle=None,
+            self,
+            name="untitled",
+            type="",
+            channel_count=1,
+            nominal_srate=IRREGULAR_RATE,
+            channel_format=ValueFormats.CF_FLOAT32.value,
+            source_id="",
+            handle=None,
     ):
         """Construct a new StreamInfo object.
 
@@ -336,7 +336,7 @@ class StreamInfo:
         """Channel format of the stream.
 
         All channels in a stream have the same format. However, a device might
-        offer multiple time-synched streams each with its own format.
+        offer multiple time-synced streams each with its own format.
 
         """
         return lib.lsl_get_channel_format(self.obj)
@@ -359,9 +359,9 @@ class StreamInfo:
         return lib.lsl_get_version(self.obj)
 
     def created_at(self):
-        """Creation time stamp of the stream.
+        """Creation timestamp of the stream.
 
-        This is the time stamp when the stream was first created
+        This is the timestamp when the stream was first created
         (as determined via local_clock() on the providing machine).
 
         """
@@ -382,7 +382,7 @@ class StreamInfo:
 
         The session id is an optional human-assigned identifier of the
         recording session. While it is rarely used, it can be used to prevent
-        concurrent recording activities on the same sub-network (e.g., in
+        concurrent recording activities on the same subnetwork (e.g., in
         multiple experiment areas) from seeing each other's streams
         (can be assigned in a configuration file read by liblsl, see also
         Network Connectivity in the LSL wiki).
@@ -439,11 +439,11 @@ class StreamInfo:
             List of channel names, matching the number of total channels.
             If ``None``, the channel names are not set.
 
-            .. warning::
+            . warning::
 
                 If a list of str and ``None`` are returned, some of the channel names
                 are missing. This is not expected and could occur if the XML tree in
-                the ``desc`` property is tempered with outside of the defined getter and
+                the ``desc`` property is tempered with outside the defined getter and
                 setter.
         """
         return self._get_channel_info("label")
@@ -457,11 +457,11 @@ class StreamInfo:
             List of channel types, matching the number of total channels.
             If ``None``, the channel types are not set.
 
-            .. warning::
+            . warning::
 
                 If a list of str and ``None`` are returned, some of the channel types
                 are missing. This is not expected and could occur if the XML tree in
-                the ``desc`` property is tempered with outside of the defined getter and
+                the ``desc`` property is tempered with outside the defined getter and
                 setter.
         """
         return self._get_channel_info("type")
@@ -475,11 +475,11 @@ class StreamInfo:
             List of channel units, matching the number of total channels.
             If ``None``, the channel units are not set.
 
-            .. warning::
+            . warning::
 
                 If a list of str and ``None`` are returned, some of the channel units
                 are missing. This is not expected and could occur if the XML tree in
-                the ``desc`` property is tempered with outside of the defined getter and
+                the ``desc`` property is tempered with outside the defined getter and
                 setter.
         """
         return self._get_channel_info("unit")
@@ -520,7 +520,7 @@ class StreamInfo:
     def set_channel_types(self, types):
         """Set the channel types in the description. Existing types are overwritten.
 
-        The types are given as human readable strings, e.g. ``'eeg'``.
+        The types are given as human-readable strings, e.g. ``'eeg'``.
 
         Parameters
         ----------
@@ -534,9 +534,9 @@ class StreamInfo:
     def set_channel_units(self, units):
         """Set the channel units in the description. Existing units are overwritten.
 
-        The units are given as human readable strings, e.g. ``'microvolts'``, or as
+        The units are given as human-readable strings, e.g. ``'micro volts'``, or as
         multiplication factor, e.g. ``-6`` for ``1e-6`` thus converting e.g. Volts to
-        microvolts.
+        micro volts.
 
         Parameters
         ----------
@@ -707,10 +707,10 @@ class StreamOutlet:
         timestamp -- Optional, float or 1-D list of floats.
                      If float: the capture time of the most recent sample, in
                      agreement with local_clock(); if omitted/default (0.0), the current
-                     time is used. The time stamps of other samples are
+                     time is used. The timestamps of other samples are
                      automatically derived according to the sampling rate of
                      the stream.
-                     If list of floats: the time stamps for each sample.
+                     If list of floats: the timestamps for each sample.
                      Must be the same length as `samples`.
         pushthrough Whether to push the chunk through to the receivers instead
                     of buffering it with subsequent samples. Note that the
@@ -914,7 +914,7 @@ class StreamInlet:
     """
 
     def __init__(
-        self, info, max_buflen=360, max_chunklen=0, recover=True, processing_flags=0
+            self, info, max_buflen=360, max_chunklen=0, recover=True, processing_flags=0
     ):
         """Construct a new stream inlet from a resolved stream description.
 
@@ -941,7 +941,7 @@ class StreamInlet:
                         unspecified (=0), the sender determines the chunk
                         granularity. (default 0)
         recover -- Try to silently recover lost streams that are recoverable
-                   (=those that that have a source_id set). In all other cases
+                   (=those that have a source_id set). In all other cases
                    (recover is False or the stream is not recoverable)
                    functions may throw a lost_error if the stream's source is
                    lost (e.g., due to an app or computer crash). (default True)
@@ -1040,7 +1040,7 @@ class StreamInlet:
                    (default FOREVER).
 
         Returns the current time correction estimate. This is the number that
-        needs to be added to a time stamp that was remotely generated via
+        needs to be added to a timestamp that was remotely generated via
         local_clock() to map it into the local clock domain of this
         machine.
 
@@ -1064,7 +1064,7 @@ class StreamInlet:
         Returns a tuple (sample,timestamp) where sample is a list of channel
         values and timestamp is the capture time of the sample on the remote
         machine, or (None,None) if no new sample was available. To remap this
-        time stamp to the local clock, add the value returned by
+        timestamp to the local clock, add the value returned by
         .time_correction() to it.
 
         Throws a LostError if the stream source has been lost. Note that, if
@@ -1521,7 +1521,7 @@ def find_liblsl_libraries(verbose=False):
                 "Skipping PYLSL_LIB:",
                 path,
                 " because it was either not " + "found or is not a valid file",
-            )
+                )
 
     os_name = platform.system()
     if os_name in ["Windows", "Microsoft"]:
@@ -1535,7 +1535,7 @@ def find_liblsl_libraries(verbose=False):
 
     libbasepath = os.path.join(os.path.dirname(__file__), "lib")
 
-    # because there were quite a few errors with pickung up old binaries
+    # because there were quite a few errors with picking up old binaries
     # still lurking in the system or environment, we first search through all
     # prefix/suffix/bitness variants in the package itself, i.e. in libbasepath
     # before searching through the system with util.find_library
@@ -1547,7 +1547,7 @@ def find_liblsl_libraries(verbose=False):
                         path = os.path.join(
                             libbasepath,
                             libprefix + "lsl" + bitness + debugsuffix + libsuffix,
-                        )
+                            )
                         if os.path.isfile(path):
                             yield path
                     elif (scope == "system") and os_name not in [
@@ -1570,7 +1570,7 @@ def find_liblsl_libraries(verbose=False):
                             # MacOS >= 10.15 requires only searches 1 or 2 paths, thus requires the full lib path
                             # https://bugs.python.org/issue43964#msg394782
                             # Here we try the default homebrew folder, but you may have installed it elsewhere,
-                            #  in which case you'd use the DYLD_LIBRARY_PATH (see error message below)".
+                            #  in which case you'd use the DYLD_LIBRARY_PATH (see error message below).
                             path = util.find_library("/opt/homebrew/lib/" + quallibname)
                         if path is not None:
                             yield path
@@ -1592,16 +1592,15 @@ if platform.system() == "Darwin":
         "environment variable. e.g. `>DYLD_LIBRARY_PATH=/opt/homebrew/lib python path/to/my_lsl_script.py`"
     )
 
-
 try:
     libpath = next(find_liblsl_libraries())
     lib = CDLL(libpath)
 except StopIteration:
     err_msg = (
-        "LSL binary library file was not found. Please make sure that the "
-        + "binary file can be found in the package lib folder\n ("
-        + os.path.join(os.path.dirname(__file__), "lib")
-        + ")\n or "
+            "LSL binary library file was not found. Please make sure that the "
+            + "binary file can be found in the package lib folder\n ("
+            + os.path.join(os.path.dirname(__file__), "lib")
+            + ")\n or "
     )
     if platform.system() not in ["Windows", "Microsoft"]:
         err_msg += "the system search path. Alternatively, "
@@ -1613,7 +1612,6 @@ except OSError:
     if platform.system() in ["Windows", "Microsoft"]:
         err_msg += "You may need to download and install the latest Microsoft Visual C++ Redistributable."
     raise RuntimeError(err_msg + "\n " + __dload_msg)
-
 
 # set function return types where necessary
 lib.lsl_local_clock.restype = c_double
@@ -1722,7 +1720,6 @@ try:
 except Exception:
     print("pylsl: ContinuousResolver not (fully) available in your liblsl " "version.")
 
-
 # int64 support on windows and 32bit OSes isn't there yet
 if struct.calcsize("P") != 4 and platform.system() != "Windows":
     push_sample_int64 = lib.lsl_push_sample_ltp
@@ -1734,6 +1731,7 @@ else:
 
     def push_sample_int64(*_):
         raise NotImplementedError("int64 support isn't enabled on your platform")
+
 
     pull_sample_int64 = push_sample_int64
     push_chunk_int64 = push_sample_int64
