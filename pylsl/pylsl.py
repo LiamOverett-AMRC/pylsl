@@ -19,87 +19,173 @@ pylsl has been tested with Python 2.7 and 3.4.
 import os
 import platform
 import struct
-from ctypes import (
-    CDLL,
-    POINTER,
-    byref,
-    c_byte,
-    c_char_p,
-    c_double,
-    c_float,
-    c_int,
-    c_long,
-    c_longlong,
-    c_short,
-    c_size_t,
-    c_void_p,
-    cast,
-    util,
-)
+import warnings
+from ctypes import byref, c_byte, c_char_p, c_double, c_float, c_int, c_long, c_longlong, c_short, c_size_t, c_void_p, \
+    cast, CDLL, POINTER, util
+from enum import IntEnum
 
-__all__ = [
-    "IRREGULAR_RATE",
-    "DEDUCED_TIMESTAMP",
-    "FOREVER",
-    "cf_float32",
-    "cf_double64",
-    "cf_string",
-    "cf_int32",
-    "cf_int16",
-    "cf_int8",
-    "cf_int64",
-    "cf_undefined",
-    "protocol_version",
-    "library_version",
-    "library_info",
-    "local_clock",
-    "StreamInfo",
-    "StreamOutlet",
-    "resolve_streams",
-    "resolve_byprop",
-    "resolve_bypred",
-    "StreamInlet",
-    "XMLElement",
-    "ContinuousResolver",
-    "TimeoutError",
-    "LostError",
-    "InvalidArgumentError",
-    "InternalError",
-    "stream_info",
-    "stream_outlet",
-    "stream_inlet",
-    "xml_element",
-    "timeout_error",
-    "lost_error",
-    "vectorf",
-    "vectord",
-    "vectorl",
-    "vectori",
-    "vectors",
-    "vectorc",
-    "vectorstr",
-    "resolve_stream",
-]
+
+class _Deprecated:
+    """
+    Static class to wrap deprecated module variable names in a set.
+    Keeps backwards compatibility with older versions of the pylsl until they are phased out.
+    """
+
+    _deprecated_value_format_names = {"cf_undefined", "cf_float32", "cf_double64", "cf_string", "cf_int32", "cf_int16",
+                                      "cf_int8", "cf_int64"}
+
+    _deprecated_post_proc_names = {"proc_none", "proc_clocksync", "proc_dejitter", "proc_monotonize", "proc_threadsafe",
+                                   "proc_ALL"}
+
+    _deprecated_pylsl_alias_class_names = {"stream_info", "stream_outlet", "stream_inlet", "xml_element",
+                                           "timeout_error", "lost_error"}
+
+    _deprecated_pylsl_alias_vector_names = {"vectorf", "vectord", "vectorl", "vectori", "vectors", "vectorc",
+                                            "vectorstr"}
+
+    @staticmethod
+    def get_value_format_names() -> set[str]:
+        """
+        Get pylsl deprecated value format variables names.
+        :return: set of deprecated value format names.
+        """
+
+        return _Deprecated._deprecated_value_format_names
+
+    @staticmethod
+    def get_post_proc_names() -> set[str]:
+        """
+        Get pylsl deprecated post process variables names.
+        :return: set of deprecated post process variable names.
+        """
+
+        return _Deprecated._deprecated_post_proc_names
+
+    @staticmethod
+    def get_pylsl_alias_class_names() -> set[str]:
+        """
+        Get pylsl deprecated alias class names.
+        :return: set of deprecated alias variable names.
+        """
+
+        return _Deprecated._deprecated_pylsl_alias_class_names
+
+    @staticmethod
+    def get_pylsl_alias_vector_names() -> set[str]:
+        """
+        Get pylsl deprecated alias vector variables names.
+        :return: set of deprecated alias vector variable names.
+        """
+
+        return _Deprecated._deprecated_pylsl_alias_vector_names
+
+
+def __getattr__(name):
+    """
+    Throw deprecated warning if constants enums are called as variables instead of from the enum classes
+    """
+
+    if name in _Deprecated.get_value_format_names():
+        warnings.warn(f"{name} is deprecated. Use `ValueFormats.{name.upper()}.value` instead.", DeprecationWarning,
+                      stacklevel=3)
+        return globals()[f"_deprecated_{name}"]
+
+    if name in _Deprecated.get_post_proc_names():
+        warnings.warn(f"{name} is deprecated. Use `PostProcessing.{name.upper()}.value` instead.", DeprecationWarning,
+                      stacklevel=3)
+        return globals()[f"_deprecated_{name}"]
+
+    if name in _Deprecated.get_pylsl_alias_class_names():
+        if name is "xml_element":
+            message = f"{name} is deprecated. Use `XMLElement` instead."
+        else:
+            message = f"{name} is deprecated. Use `{name.title().replace("_", "")}` instead."
+
+        warnings.warn(message, DeprecationWarning, stacklevel=3)
+        return globals()[f"_deprecated_{name}"]
+
+    if name in _Deprecated.get_pylsl_alias_vector_names():
+        warnings.warn(f"f{name} is deprecated.", DeprecationWarning, stacklevel=3)
+        return globals()[f"_deprecated_{name}"]
+
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
+
+__all__ = ([
+               "IRREGULAR_RATE",
+               "DEDUCED_TIMESTAMP",
+               "FOREVER",
+               "ValueFormats",
+               "PostProcessing",
+               "protocol_version",
+               "library_version",
+               "library_info",
+               "local_clock",
+               "StreamInfo",
+               "StreamOutlet",
+               "resolve_streams",
+               "resolve_byprop",
+               "resolve_bypred",
+               "StreamInlet",
+               "XMLElement",
+               "ContinuousResolver",
+               "TimeoutError",
+               "LostError",
+               "InvalidArgumentError",
+               "InternalError"
+           ]
+           + list(_Deprecated.get_value_format_names())
+           + list(_Deprecated.get_post_proc_names())
+           + list(_Deprecated.get_pylsl_alias_class_names())
+           + list(_Deprecated.get_pylsl_alias_vector_names())
+           )
 
 # =================
 # === Constants ===
 # =================
 
-# Constant to indicate that a stream has variable sampling rate.
-IRREGULAR_RATE = 0.0
+# Deprecated enum module variables for value formats supported by Lab Streaming Layer (LSL).
+_deprecated_cf_float32 = 1
+_deprecated_cf_double64 = 2
+_deprecated_cf_string = 3
+_deprecated_cf_int32 = 4
+_deprecated_cf_int16 = 5
+_deprecated_cf_int8 = 6
+_deprecated_cf_int64 = 7
+_deprecated_cf_undefined = 0
 
-# Constant to indicate that a sample has the next successive time stamp
-# according to the stream's defined sampling rate. Optional optimization to
-# transmit less data per sample.
+# Deprecated enum module variables for post-processing functions supported by Lab Streaming Layer (LSL).
+_deprecated_proc_none = 0
+_deprecated_proc_clocksync = 1
+_deprecated_proc_dejitter = 2
+_deprecated_proc_monotonize = 4
+_deprecated_proc_threadsafe = 8
+_deprecated_proc_ALL = (
+        _deprecated_proc_none |
+        _deprecated_proc_clocksync |
+        _deprecated_proc_dejitter |
+        _deprecated_proc_monotonize |
+        _deprecated_proc_threadsafe
+)
+
+IRREGULAR_RATE = 0.0
+"""
+Constant to indicate that a stream has a variable sampling rate.
+"""
+
 DEDUCED_TIMESTAMP = -1.0
+"""
+Constant to indicate that a sample has the next successive timestamp according to the stream's defined sampling rate.
+Optional optimization to transmit less data per sample.
+"""
 
 # A very large time value (ca. 1 year); can be used in timeouts.
 FOREVER = 32000000.0
+"""
+A very large time value (ca. 1 year). Can be used in timeouts.
+"""
 
-# Value formats supported by LSL. LSL data streams are sequences of samples,
-# each of which is a same-size vector of values with one of the below types.
 
-# For up to 24-bit precision measurements in the appropriate physical unit (
 class ValueFormats(IntEnum):
     """
     Value formats supported by Lab Streaming Layer (LSL).
@@ -746,7 +832,7 @@ class StreamOutlet:
         else:
             raise ValueError(
                 "length of the sample (" + str(len(x)) + ") must "
-                "correspond to the stream's channel count ("
+                                                         "correspond to the stream's channel count ("
                 + str(self.channel_count)
                 + ")."
             )
@@ -1519,16 +1605,21 @@ def handle_error(errcode):
 # =================================================
 
 # set class aliases
-stream_info = StreamInfo
-stream_outlet = StreamOutlet
-stream_inlet = StreamInlet
-xml_element = XMLElement
-timeout_error = TimeoutError
-lost_error = LostError
-vectorf = vectord = vectorl = vectori = vectors = vectorc = vectorstr = list
+_deprecated_stream_info = StreamInfo
+_deprecated_stream_outlet = StreamOutlet
+_deprecated_stream_inlet = StreamInlet
+_deprecated_xml_element = XMLElement
+_deprecated_timeout_error = TimeoutError
+_deprecated_lost_error = LostError
+_deprecated_vectorf = _deprecated_vectord = _deprecated_vectorl = _deprecated_vectori = _deprecated_vectors = \
+    _deprecated_vectorc = _deprecated_vectorstr = list
 
 
 def resolve_stream(*args):
+    warnings.warn(
+        "`resolve_stream()` is deprecated. Use `ContinuousResolver` class or `resolve_streams()`, \
+         `resolve_byprop()` or `resolve_bypred()` functions instead.", DeprecationWarning, stacklevel=3)
+
     if len(args) == 0:
         return resolve_streams()
     elif type(args[0]) in [int, float]:
@@ -1574,7 +1665,7 @@ def find_liblsl_libraries(verbose=False):
                 "Skipping PYLSL_LIB:",
                 path,
                 " because it was either not " + "found or is not a valid file",
-                )
+            )
 
     os_name = platform.system()
     if os_name in ["Windows", "Microsoft"]:
@@ -1600,7 +1691,7 @@ def find_liblsl_libraries(verbose=False):
                         path = os.path.join(
                             libbasepath,
                             libprefix + "lsl" + bitness + debugsuffix + libsuffix,
-                            )
+                        )
                         if os.path.isfile(path):
                             yield path
                     elif (scope == "system") and os_name not in [
